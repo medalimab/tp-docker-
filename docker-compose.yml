@@ -1,0 +1,39 @@
+
+services:
+  mongodb:
+    image: mongo:6.0
+    container_name: mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    networks:
+      - mern-network
+
+  server:
+    build: ./server
+    container_name: server
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    environment:
+      - MONGO_URI=mongodb://mongodb:27017
+      - PORT=9000
+    depends_on:
+      - mongodb
+    networks:
+      - mern-network
+
+  client:
+    build: ./client
+    container_name: client
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      - server
+    networks:
+      - mern-network
+
+networks:
+  mern-network:
+    driver: bridge
