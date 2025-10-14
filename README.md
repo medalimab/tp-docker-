@@ -3,13 +3,20 @@
 ## Vue d'Ensemble
 Ce projet est une application full-stack qui consiste en un client React et un serveur Node.js utilisant MongoDB comme base de données. Docker est utilisé pour la conteneurisation, et Docker Compose est utilisé pour orchestrer les services.
 
+## Capture d'écran de l'exécution
+![Exécution de l'application](screenshot.png)
+
 ## Table des Matières
-- [Technologies Utilisées](#technologies-utilisées)
-- [Variables d'Environnement](#variables-denvironnement)
-- [Configuration de Docker](#configuration-de-docker)
-- [Images Docker](#images-docker)
-- [Docker Compose](#docker-compose)
-- [Comment Exécuter le Projet](#comment-executer-le-projet)
+- [MERN APP](#mern-app)
+  - [Vue d'Ensemble](#vue-densemble)
+  - [Capture d'écran de l'exécution](#capture-décran-de-lexécution)
+  - [Table des Matières](#table-des-matières)
+  - [Technologies Utilisées](#technologies-utilisées)
+  - [Variables d'Environnement](#variables-denvironnement)
+  - [Configuration de Docker](#configuration-de-docker)
+  - [Images Docker](#images-docker)
+  - [Docker Compose](#docker-compose)
+  - [Comment Exécuter le Projet](#comment-exécuter-le-projet)
 
 ## Technologies Utilisées
 - **Frontend** : React
