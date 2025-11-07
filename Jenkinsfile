@@ -1,87 +1,74 @@
 pipeline {
-  agent any
+    agent any
 
-  options {
-    disableConcurrentBuilds()
-    timestamps()
-    ansiColor('xterm')
-    buildDiscarder(logRotator(numToKeepStr: '15'))
-  }
+    options {
+        timestamps() // Affiche l'heure sur chaque ligne de log (utile)
+        disableConcurrentBuilds() // Empêche les builds simultanés
+    }
 
-  environment {
-    // ---- à adapter si besoin ----
-    NAMESPACE     = 'daliii'
-    IMAGE_SERVER  = "${NAMESPACE}/mern-server"
-    IMAGE_CLIENT  = "${NAMESPACE}/mern-client"
-    DOCKER_CREDS  = 'dockerhub' // CredentialsID Jenkins (username/password Docker Hub)
-    COMMIT        = ''          // sera rempli au stage Checkout
-  }
+    environment {
+        DOCKERHUB_CREDENTIALS = 'dockerhub' // ID que tu as créé dans Jenkins
+        IMAGE_SERVER = 'daliii/mern-server'
+        IMAGE_CLIENT = 'daliii/mern-client'
+    }
 
-  stages {
-
-    stage('Checkout') {
-      steps {
-        checkout scm
-        script {
-          COMMIT = sh(script: "git rev-parse --short=8 HEAD", returnStdout: true).trim()
-          env.COMMIT = COMMIT
-          echo "Commit: ${COMMIT}"
+    stages {
+        stage('Checkout Code') {
+            steps {
+                checkout scm
+            }
         }
-      }
-    }
 
-    stage('Docker login') {
-      steps {
-        withCredentials([usernamePassword(credentialsId: "${DOCKER_CREDS}",
-                                          usernameVariable: 'DH_USER',
-                                          passwordVariable: 'DH_PASS')]) {
-          sh '''
-            echo "$DH_PASS" | docker login -u "$DH_USER" --password-stdin
-          '''
+        stage('Docker Login') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: "${DOCKERHUB_CREDENTIALS}", 
+                                                  usernameVariable: 'DOCKER_USER', 
+                                                  passwordVariable: 'DOCKER_PASS')]) {
+                    sh '''
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                    '''
+                }
+            }
         }
-      }
+
+        stage('Build & Push Server Image') {
+            when {
+                expression { return fileExists('server/Dockerfile') }
+            }
+            steps {
+                sh '''
+                    docker build -t ${IMAGE_SERVER}:${BUILD_NUMBER} server
+                    docker push ${IMAGE_SERVER}:${BUILD_NUMBER}
+                    docker tag ${IMAGE_SERVER}:${BUILD_NUMBER} ${IMAGE_SERVER}:latest
+                    docker push ${IMAGE_SERVER}:latest
+                '''
+            }
+        }
+
+        stage('Build & Push Client Image') {
+            when {
+                expression { return fileExists('client/Dockerfile') }
+            }
+            steps {
+                sh '''
+                    docker build -t ${IMAGE_CLIENT}:${BUILD_NUMBER} client
+                    docker push ${IMAGE_CLIENT}:${BUILD_NUMBER}
+                    docker tag ${IMAGE_CLIENT}:${BUILD_NUMBER} ${IMAGE_CLIENT}:latest
+                    docker push ${IMAGE_CLIENT}:latest
+                '''
+            }
+        }
     }
 
-    stage('Build & Push SERVER') {
-      when {
-        changeset pattern: 'server/**', comparator: 'INCLUDE'
-      }
-      steps {
-        sh '''
-          echo "Building ${IMAGE_SERVER}:${COMMIT}"
-          docker build -t ${IMAGE_SERVER}:${COMMIT} server
-          docker tag  ${IMAGE_SERVER}:${COMMIT} ${IMAGE_SERVER}:latest
-          docker push ${IMAGE_SERVER}:${COMMIT}
-          docker push ${IMAGE_SERVER}:latest
-        '''
-      }
+    post {
+        always {
+            sh 'docker system prune -af || true'
+        }
+        success {
+            echo "✅ Build terminé et images poussées sur Docker Hub avec succès !"
+        }
+        failure {
+            echo "❌ Build échoué — vérifie la console Jenkins."
+        }
     }
-
-    stage('Build & Push CLIENT') {
-      when {
-        changeset pattern: 'client/**', comparator: 'INCLUDE'
-      }
-      steps {
-        sh '''
-          echo "Building ${IMAGE_CLIENT}:${COMMIT}"
-          docker build -t ${IMAGE_CLIENT}:${COMMIT} client
-          docker tag  ${IMAGE_CLIENT}:${COMMIT} ${IMAGE_CLIENT}:latest
-          docker push ${IMAGE_CLIENT}:${COMMIT}
-          docker push ${IMAGE_CLIENT}:latest
-        '''
-      }
-    }
-  }
-
-  post {
-    always {
-      sh 'docker system prune -af || true'
-    }
-    success {
-      echo "✅ Images poussées: ${IMAGE_SERVER}:${COMMIT} / latest, ${IMAGE_CLIENT}:${COMMIT} / latest"
-    }
-    failure {
-      echo "❌ Build échoué — vérifier la console Jenkins."
-    }
-  }
 }
