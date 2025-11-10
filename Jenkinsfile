@@ -8,15 +8,13 @@ pipeline {
   }
 
   environment {
-    // ==== À adapter si besoin ====
     REPO_URL  = 'https://github.com/medalimab/tp-docker-.git'
     BRANCH    = 'main'
 
-    DOCKERHUB_CREDENTIALS = 'dockerhub'    // ID des creds Docker Hub dans Jenkins
+    DOCKERHUB_CREDENTIALS = 'dockerhub'
     IMAGE_SERVER = 'daliii/mern-server'
     IMAGE_CLIENT = 'daliii/mern-client'
 
-    // optionnel : active BuildKit (build plus rapide)
     DOCKER_BUILDKIT = '1'
   }
 
@@ -24,7 +22,7 @@ pipeline {
 
     stage('Checkout Code') {
       steps {
-        deleteDir() // workspace propre
+        deleteDir()
         git branch: env.BRANCH, url: env.REPO_URL
       }
     }
@@ -66,6 +64,40 @@ pipeline {
         '''
       }
     }
+
+    // ---------- TRIVY SCANS ----------
+    stage('Trivy Scan (server)') {
+      when { expression { return fileExists('server/Dockerfile') } }
+      steps {
+        sh '''
+          # Scan CRITICAL,HIGH et sauvegarde du rapport
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:latest image --no-progress \
+            --severity CRITICAL,HIGH \
+            ${IMAGE_SERVER}:${BUILD_NUMBER} | tee trivy_report_server.txt
+
+          # ne pas faire échouer le job sur findings
+          true
+        '''
+        archiveArtifacts artifacts: 'trivy_report_server.txt', onlyIfSuccessful: false
+      }
+    }
+
+    stage('Trivy Scan (client)') {
+      when { expression { return fileExists('client/Dockerfile') } }
+      steps {
+        sh '''
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:latest image --no-progress \
+            --severity CRITICAL,HIGH \
+            ${IMAGE_CLIENT}:${BUILD_NUMBER} | tee trivy_report_client.txt
+          true
+        '''
+        archiveArtifacts artifacts: 'trivy_report_client.txt', onlyIfSuccessful: false
+      }
+    }
   }
 
   post {
@@ -73,7 +105,7 @@ pipeline {
       sh 'docker system prune -af || true'
     }
     success {
-      echo "✅ Build terminé et images poussées sur Docker Hub avec succès !"
+      echo "✅ Build terminé, images poussées, et rapports Trivy archivés."
     }
     failure {
       echo "❌ Build échoué — vérifie la console Jenkins."
